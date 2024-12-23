@@ -1,22 +1,15 @@
 import React, { useState ,useEffect,useRef} from "react";
 import { FaUpload, FaArrowUp, FaCopy, FaArrowDown } from "react-icons/fa";
-import {
-  GoogleGenerativeAI,
-  HarmCategory,
-  HarmBlockThreshold,
-} from "@google/generative-ai";
+
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { atomDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
-
-// import {
-//   docco,
-//   atomOneDark,
-// // } from "react-syntax-highlighter/dist/esm/styles/hljs";
 import TextArea from "antd/es/input/TextArea";
 import { Skeleton,message } from "antd";
 import { FaDeleteLeft } from "react-icons/fa6";
 import { AiFillDelete } from "react-icons/ai";
 import { CopyToClipboard } from 'react-copy-to-clipboard';
+import { classifyAndFormat } from "../helper functions";
+import { run } from "../gemini";
 
 const PromptInput = () => {
   const [data, setData] = useState(null);
@@ -82,10 +75,7 @@ const PromptInput = () => {
       reader.readAsText(file);
     }
   };
-  const handleCopy = (code) => {
-    navigator.clipboard.writeText(code);
-    alert("Code copied to clipboard!");
-  };
+
   const handlePaste = (e) => {
     const pastedText = e.clipboardData.getData("Text");
     if (pastedText.length > 500) {
@@ -112,35 +102,7 @@ const PromptInput = () => {
     );
     return allInputs.join("\n"); // You can adjust how you join them (e.g., with new lines)
   };
-  const run = async (inputContent) => {
-    setLoading(true);
-    const apiKey = "AIzaSyBFwulNrgJEFPNQbm6BU6S0k6NrEUVmQFY";
-    const genAI = new GoogleGenerativeAI(apiKey);
-
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.0-flash-exp",
-    });
-
-    const generationConfig = {
-      temperature: 1,
-      topP: 0.95,
-      topK: 40,
-      maxOutputTokens: 8192,
-      responseMimeType: "text/plain",
-    };
-
-    const chatSession = model.startChat({
-      generationConfig,
-      history: [],
-    });
-
-    const result = await chatSession.sendMessage(inputContent);
-    setLoading(false); // Use the input content from textarea, pasted codes, or file
-    console.log(result.response.text());
-    const output = result.response.text();
-    return output;
-    setData(output);
-  };
+ 
 
   const handleSubmit = async () => {
     const inputContent = getAllInputContent();
@@ -160,7 +122,8 @@ const PromptInput = () => {
           );
           
     } catch (error) {
-        
+        //antd error message
+        message.error("An error occurred while generating please try again ")
         
 
     }
@@ -171,244 +134,9 @@ const PromptInput = () => {
         setUploadedFileContent(null)
         
     }
-    // await run(inputContent);
 
   };
-  // const classifyAndFormat = (content) => {
-  //   const lines = content.split("\n");
-  //   let formattedOutput = [];
-  //   let inCodeBlock = false;
-  //   let language = null;
-  //   let codeLines = [];
-
-  //   lines.forEach((line) => {
-  //     // Handle code block start or end
-  //     if (line.startsWith("")) {
-  //       if (!inCodeBlock) {
-  //         inCodeBlock = true;
-  //         language = line.replace(/\/\//, "").trim();
-  //                   console.log(language);
-  //       } else {
-  //         inCodeBlock = false;
-  //         formattedOutput.push(
-  //           <div key={formattedOutput.length} className="my-4">
-  //             <div className="bg-gray-800 p-2 rounded-t-lg flex justify-between items-center">
-  //               <span className="text-white text-sm">{language || "Code"}</span>
-  //               <button
-  //                 className="text-white hover:text-gray-200"
-  //                 onClick={() => handleCopy(codeLines.join("\n"))}
-  //               >
-  //                 <FaCopy />
-  //               </button>
-  //             </div>
-  //             <SyntaxHighlighter
-  //               language={language || "python"}
-  //               style={atomOneDark}
-  //               className="bg-black"
-  //               customStyle={{ borderRadius: "0 0 8px 8px", margin: 0 }}
-  //             >
-  //               {codeLines.join("\n")}
-  //             </SyntaxHighlighter>
-  //           </div>
-  //         );
-  //         codeLines = [];
-  //       }
-  //     } else if (inCodeBlock) {
-  //       codeLines.push(line);
-  //     }
-  //     // Handle headings (double asterisks)
-  //     else if (/^\\.\\*$/.test(line)) {
-  //       formattedOutput.push(
-  //         <h2
-  //           key={formattedOutput.length}
-  //           className="text-blue-400 text-lg font-semibold mt-4"
-  //         >
-  //           {line.replace(/\\/g, "").trim()}
-  //         </h2>
-  //       );
-  //     }
-  //     // Handle list items (single asterisk)
-  //     else if (/^\* .*/.test(line)) {
-  //       formattedOutput.push(
-  //         <ul
-  //           key={formattedOutput.length}
-  //           className="text-gray-300 list-disc pl-6 mt-2"
-  //         >
-  //           <li>{line.replace(/^\* /, "").trim()}</li>
-  //         </ul>
-  //       );
-  //     }
-  //     // Handle normal text
-  //     else if (line.trim().length > 0) {
-  //       formattedOutput.push(
-  //         <p key={formattedOutput.length} className="text-gray-300">
-  //           {line.trim()}
-  //         </p>
-  //       );
-  //     }
-  //   });
-
-  //   return formattedOutput;
-  // };
-
-  // Example Input
-  const classifyAndFormat = (content) => {
-    const lines = content.split('\n');
-    const formattedOutput = [];
-    let inCodeBlock = false;
-    let language = null;
-    let codeLines = [];
   
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-  
-      // Handle code block start or end
-      if (/^\s*```/.test(line)) {
-        if (!inCodeBlock) {
-          inCodeBlock = true;
-          const match = line.match(/^\s*```(\w+)?/);
-          language = match && match[1] ? match[1] : 'text';
-        } else {
-          inCodeBlock = false;
-          formattedOutput.push(
-            <div key={formattedOutput.length} className="my-4">
-              <div className="bg-gray-800 p-2 rounded-t-lg flex justify-between items-center text-white">
-                <span className="text-white text-sm">{language || 'Code'}</span>
-                <CopyToClipboard text={codeLines.join('\n')}>
-                  <button className="text-white hover:text-gray-200">
-                    <FaCopy />
-                  </button>
-                </CopyToClipboard>
-              </div>
-              <SyntaxHighlighter
-                language={language}
-                style={atomDark}
-                customStyle={{ borderRadius: '0 0 8px 8px', margin: 0 }}
-              >
-                {codeLines.join('\n')}
-              </SyntaxHighlighter>
-            </div>
-          );
-          codeLines = [];
-        }
-      } else if (inCodeBlock) {
-        codeLines.push(line);
-      } else {
-        // Handle bold text (**bold**)
-        const boldPattern = /\*\*(.+?)\*\*/g;
-  
-        // Handle inline code (`code`)
-        const codePattern = /`([^`]*)`/g;
-  
-        if (boldPattern.test(line) || codePattern.test(line)) {
-          // Replace bold text and code snippets with respective styles
-          const highlightedContent = line
-            .replace(boldPattern, '<span class="font-extrabold text-white">$1</span>')
-            .replace(
-              codePattern,
-              '<span class="bg-grey-400 text-gray-200 px-1 py-0.5 rounded">$1</span>'
-            );
-  
-          formattedOutput.push(
-            <p
-              key={formattedOutput.length}
-              className="white mt-2"
-              dangerouslySetInnerHTML={{ __html: highlightedContent }}
-            />
-          );
-        } else if (/^\*\s.+/.test(line)) {
-          // Convert single star at the start to a list item
-          formattedOutput.push(
-            <ul key={formattedOutput.length} className="text-white list-disc pl-6 mt-2">
-              <li>{line.replace(/^\*\s/, '').trim()}</li>
-            </ul>
-          );
-        } else if (/^\*\*\*.+/.test(line)) {
-          formattedOutput.push(
-            <h3 key={formattedOutput.length} className="text-blue-400 text-lg font-semibold mt-4">
-              {line.replace(/^\*\*\*/, '').trim()}
-            </h3>
-          );
-        } else if (/^\*\*.+/.test(line)) {
-          formattedOutput.push(
-            <h2 key={formattedOutput.length} className="text-blue-400 text-lg font-semibold mt-4">
-              {line.replace(/^\*\*/, '').trim()}</h2>
-          );
-        } else if (line.trim()) {
-          formattedOutput.push(
-            <p key={formattedOutput.length} className="text-white">
-              {line.trim()}
-            </p>
-          );
-        }
-      }
-    }
-  
-    // Handle any remaining code lines
-    if (inCodeBlock && codeLines.length) {
-      formattedOutput.push(
-        <div key={formattedOutput.length} className="my-4">
-          <div className="bg-gray-800 p-2 rounded-t-lg flex justify-between items-center">
-            <span className="text-white text-sm">{language || 'Code'}</span>
-            <CopyToClipboard text={codeLines.join('\n')}>
-              <button className="text-white hover:text-gray-200">
-                <FaCopy />
-              </button>
-            </CopyToClipboard>
-          </div>
-          <SyntaxHighlighter
-            language={language}
-            style={atomDark}
-            customStyle={{ borderRadius: '0 0 8px 8px', margin: 0 }}
-          >
-            {codeLines.join('\n')}
-          </SyntaxHighlighter>
-        </div>
-      );
-    }
-  
-    return formattedOutput;
-  };
-  
-  
-  const content = `
-*Core Logic*
-A prime number is a whole number greater than 1 that has only two divisors: 1 and itself. 
-
-*Python Implementation*
-\\\`python
-import math
-
-def is_prime(number):
-    \"\"\" Checks if a number is prime. \"\"\"
-    if number <= 1:
-        return False
-    # More logic here...
-\\\`
-
-*Explanation*
-- Prime numbers have only two divisors.
-`;
-  if (data) {
-    // Ensure data is a string
-    const contentToFormat =
-      typeof data === "string" ? data : JSON.stringify(data, null, 2);
-
-    // Format the content
-    const formattedOutput = classifyAndFormat(contentToFormat);
-
-    // Update the UI
-    // document.getElementById("out").innerHTML = formattedOutput;
-  } else {
-    console.error("Data is null or undefined.");
-  }
-  // document.getElementById("out").innerHTML = classifyAndFormat(data);
-  // console.log(data)
-
-  // Process Content
-
-  // const output = classifyAndFormat(data);
-
   return (
     <div className="bg-gray-900 h-screen relative flex  flex-col  items-center">
       {/* <div
@@ -627,6 +355,7 @@ def is_prime(number):
         )}
       </div>
     </div>
+  
   );
 };
 
