@@ -1,6 +1,6 @@
 import React, { useState ,useEffect,useRef} from "react";
 import { FaUpload, FaArrowUp, FaCopy, FaArrowDown } from "react-icons/fa";
-
+import Markdown from 'react-markdown'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { atomDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import TextArea from "antd/es/input/TextArea";
@@ -207,6 +207,10 @@ const PromptInput = () => {
         )}
        
       </div>
+      
+      <div>
+
+      </div>
 
       <div className="bg-gray-800  flex items-center justify-center ">
 
@@ -339,7 +343,7 @@ const PromptInput = () => {
 
         {/* Modal for Displaying Content */}
         {selectedContent && (
-          <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center custom-scrollbar">
             <div className="bg-gray-900 p-6 rounded-lg shadow-lg relative w-3/4 max-w-3xl">
               <button
                 className="absolute top-2 right-2 text-red-500 hover:text-red-700"
