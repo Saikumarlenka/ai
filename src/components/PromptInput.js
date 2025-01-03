@@ -1,18 +1,63 @@
 import React, { useState ,useEffect,useRef} from "react";
 import { FaUpload, FaArrowUp, FaCopy, FaArrowDown } from "react-icons/fa";
-import Markdown from 'react-markdown'
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { atomDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import TextArea from "antd/es/input/TextArea";
 import { Skeleton,message } from "antd";
-import { FaDeleteLeft } from "react-icons/fa6";
 import { AiFillDelete } from "react-icons/ai";
-import { CopyToClipboard } from 'react-copy-to-clipboard';
 import { classifyAndFormat } from "../helper functions";
 import { run } from "../gemini";
+import { Modal, Button } from "antd";
+import { GoogleOutlined } from "@ant-design/icons";
+import { useDispatch, useSelector } from 'react-redux';
+import {addNewChat,setCurrentChat,sendMessage, selectCurrentChat, selectallChats,updateMessage, loadChats} from '../redux/chat/chatSlice'
+import { loginWithGoogle,selectCurrentUser,checkAuth, logout, users ,fetchAllUsers} from "../redux/auth/authSlice";
+import { TbLayoutSidebarLeftExpand } from "react-icons/tb";
+import { TbLayoutSidebarLeftCollapse } from "react-icons/tb";
 
-const PromptInput = () => {
-  const [data, setData] = useState(null);
+
+
+
+const PromptInput = ({ isSidebarOpen, toggleSidebar }) => {
+  const dispatch = useDispatch()
+  useEffect(() => {
+    dispatch(fetchAllUsers());
+  }, [dispatch]);
+  const [chatMessages,setChatmessages]= useState([])
+  const [Currentuser, setCurrentUser] = useState(null);
+  const [uid,setuid]=useState(null)
+  const usersdata = useSelector(users)
+  console.log(usersdata);
+  
+  const user = useSelector(selectCurrentUser)
+  console.log(user);
+  
+
+  const currentChatid=useSelector(selectCurrentChat)
+
+  const containerRef = useRef(null);
+
+
+  useEffect(() => {
+    if (user && user.uid) {
+      dispatch(loadChats(user.uid)); // Pass user.uid to the thunk
+    }
+  }, [user, dispatch,currentChatid]);
+
+  const allchats=useSelector(selectallChats)
+  console.log(allchats);
+  
+
+
+  // const currentChatid=useSelector(selectCurrentChat)
+  console.log(currentChatid);
+  
+    useEffect(()=>{
+    const chatMessages = allchats.find((chat) => chat.id === currentChatid)?.messages || [];
+    setChatmessages(chatMessages)
+
+  },[allchats])
+
+  
+  
   const [text, setText] = useState("");
   const [pastedCodes, setPastedCodes] = useState([]);
   const [uploadedFileName, setUploadedFileName] = useState("");
@@ -23,9 +68,73 @@ const PromptInput = () => {
   const chatContainerRef = useRef(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
   const downArrowRef = useRef(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [chatTitle,setChatTitle] = useState('')
+  const [showLogout, setShowLogout] = useState(false);
+
+  useEffect(() => {
+    // Check if the user is already logged in when the app starts
+    dispatch(checkAuth());
+  }, [dispatch]);
+
+
+
+  console.log("Chat Messages:", chatMessages);
+  
+  // setMessages(chatMessages.map(({ userMessage, aiResponse }) => ({ userMessage, aiResponse })));
+
+  const showModal = () => {
+    setIsModalOpen(true);
+  };
+  
+  
+  
+  const handleImageClick = () => {
+    setShowLogout((prev) => !prev); // Toggle logout button
+  };
+
+  const handleOutsideClick = (event) => {
+    if (containerRef.current && !containerRef.current.contains(event.target)) {
+      setShowLogout(false); // Hide logout button if clicking outside
+    }
+  };
+
+  useEffect(() => {
+    // Add event listener to detect clicks outside
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => {
+      // Cleanup the event listener
+      document.removeEventListener("mousedown", handleOutsideClick);
+    };
+  }, []);
+
+  const handleCancel = () => {
+    setIsModalOpen(false);
+  };
+  const handleOk = async () => {
+    try {
+      
+      await dispatch(loginWithGoogle()).unwrap();
+      // setCurrentUser({uid: userData.uid, email: userData.email, name: userData.displayName , profilephoto:userData.photoURL})
+      
+
+      setCurrentUser(user)
+      // console.log("User signed in:", Currentuser);
+      message.success("Login successful")
+      setIsModalOpen(false);
+      // You can add logic here to save the user data to your database or state
+    } catch (error) {
+      message.error("Error during sign-in:", error);
+      setIsModalOpen(false);
+    }
+  };
+  // console.log(user);
   
 
-  console.log(data);
+  // console.log(user);
+  const handleLogout=()=>{
+    dispatch(logout())
+  }
   const handleScroll = () => {
     const container = chatContainerRef.current;
     if (container) {
@@ -102,7 +211,183 @@ const PromptInput = () => {
     );
     return allInputs.join("\n"); // You can adjust how you join them (e.g., with new lines)
   };
+//   const handleSubmit1 = async (e) => {
+//     e.preventDefault()
+//     setLoading(true);
+//     const userId = user.uid; // Assuming user object contains the userId
+//     const inputContent = getAllInputContent(); // Function that gets the input content from your UI
+//     if (inputContent.trim() === '') return; // If input is empty, don't proceed
+
+//     const newChatTitle = inputContent.split(' ').slice(0, 3).join(' ') + '...';
+  
+//     try {
+
+        
+//         // Send user input to run function to get AI response
+//         const response = await run(inputContent);
+//         // console.log("User Message:", inputContent);
+//         // console.log("AI Response:", response);
+
+//         if (currentChatid) {
+//             // If there is an active chat, send the message to that chat
+//             dispatch(sendMessage({
+//                 userId, 
+//                 chatId: currentChatid,
+//                 userMessage: inputContent, 
+//                 aiResponse: response
+//             }));
+//         } else {
+//             // Otherwise, create a new chat and set it as the current chat
+//             const chatData = await dispatch(addNewChat({
+//                 userId,
+//                 chatName: newChatTitle
+//             })).unwrap();
+
+//             dispatch(setCurrentChat(chatData.id)); // Set the newly created chat as current
+            
+//             // Send message to newly created chat
+//              dispatch(sendMessage({
+//                 userId, 
+//                 chatId: chatData.id, 
+//                 userMessage: inputContent, 
+//                 aiResponse: response
+//             }))
+//             }
+            
+       
+
+//         // Update messages state (be sure to track both userMessage and aiResponse)
+
+//     } catch (error) {
+//         console.error("Error during chat submission:", error);
+//         message.error("An error occurred while generating the response, please try again.");
+//     } finally {
+//         setLoading(false);
+//         setText(''); // Clear the input field
+//         setPastedCodes([]); // Clear pasted codes
+//         setUploadedFileContent(''); // Clear uploaded file content
+//     }
+// };
+
  
+// const handleSubmit1 = async (e) => {
+//   e.preventDefault();
+//   setLoading(true);
+//   const userId = user.uid; // Assuming user object contains the userId
+//   const inputContent = getAllInputContent(); // Function that gets the input content from your UI
+
+//   if (inputContent.trim() === '') {
+//       setLoading(false);
+//       return; // If input is empty, don't proceed
+//   }
+
+//   const newChatTitle = inputContent.split(' ').slice(0, 3).join(' ') + '...';
+
+//   try {
+//       // If there's an active chat, send the message with aiResponse as null
+//       if (currentChatid) {
+//           // Dispatch message with AI response initially null
+//           const messageData = await dispatch(
+//               sendMessage({
+//                   userId,
+//                   chatId: currentChatid,
+//                   userMessage: inputContent,
+//                   aiResponse: null,
+//               })
+//           ).unwrap();
+
+//           // Fetch AI response and update the specific message
+//           const response = await run(inputContent);
+//           dispatch(
+//               updateMessageResponse({
+//                   chatId: currentChatid,
+//                   messageId: messageData.messageId,
+//                   aiResponse: response,
+//               })
+//           );
+//       } else {
+//           // Create a new chat and set it as the current chat
+//           const chatData = await dispatch(
+//               addNewChat({
+//                   userId,
+//                   chatName: newChatTitle,
+//               })
+//           ).unwrap();
+
+//           dispatch(setCurrentChat(chatData.id)); // Set the newly created chat as current
+
+//           // Dispatch message with AI response initially null
+//           const messageData = await dispatch(
+//               sendMessage({
+//                   userId,
+//                   chatId: chatData.id,
+//                   userMessage: inputContent,
+//                   aiResponse: null,
+//               })
+//           ).unwrap();
+
+//           // Fetch AI response and update the specific message
+//           const response = await run(inputContent);
+//           dispatch(
+//               updateMessageResponse({
+//                   chatId: chatData.id,
+//                   messageId: messageData.messageId,
+//                   aiResponse: response,
+//               })
+//           );
+//       }
+//   } catch (error) {
+//       console.error('Error during chat submission:', error);
+//       message.error('An error occurred while generating the response, please try again.');
+//   } finally {
+//       setLoading(false);
+//       setText(''); // Clear the input field
+//       setPastedCodes([]); // Clear pasted codes
+//       setUploadedFileContent(''); // Clear uploaded file content
+//   }
+// };
+const handleSubmit1 = async (e) => {
+  e.preventDefault();
+  setLoading(true);
+
+  const userId = user.uid; // Assuming user object contains the userId
+  const inputContent = getAllInputContent(); // Function that gets the input content from your UI
+  if (inputContent.trim() === '') return; // If input is empty, don't proceed
+
+  const newChatTitle = inputContent.split(' ').slice(0, 3).join(' ') + '...';
+
+  try {
+    let currentChatId = currentChatid;
+
+    if (!currentChatId) {
+      // Create a new chat if none is active
+      const chatData = await dispatch(addNewChat({ userId, chatName: newChatTitle })).unwrap();
+      currentChatId = chatData.id;
+      dispatch(setCurrentChat(currentChatId));
+    }
+
+    // Add the new message to the chat
+    // dispatch(sendMessage({ userId, chatId: currentChatId, userMessage: inputContent, aiResponse: null }));
+
+    // Call AI service and update the specific message when response arrives
+    const response = await run(inputContent);
+    dispatch(sendMessage({ userId, chatId: currentChatId, userMessage: inputContent, aiResponse: response }));
+
+    // const messageIndex = allchats.find((chat) => chat.id === currentChatId)?.messages?.length - 1;
+    console.log("all chats:",allchats)
+    // console.log(messageIndex)
+
+    // dispatch(updateMessage({ chatId: currentChatId, messageIndex, aiResponse: response }));
+  } catch (error) {
+    console.error("Error during chat submission:", error);
+    message.error("An error occurred while generating the response, please try again.");
+  } finally {
+    setLoading(false);
+    setText(''); // Clear the input field
+    setPastedCodes([]); // Clear pasted codes
+    setUploadedFileContent(''); // Clear uploaded file content
+  }
+};
 
   const handleSubmit = async () => {
     const inputContent = getAllInputContent();
@@ -138,75 +423,101 @@ const PromptInput = () => {
   };
   
   return (
-    <div className="bg-gray-900 h-screen relative flex  flex-col  items-center">
-      {/* <div
-        className="mt-6 w-full max-w-3xl overflow-auto"
-        style={{ height: calc(100vh - 200px) }}
+    // <div className="bg-gray-900 h-screen relative flex  flex-col  items-center">
+      <div ref={containerRef}
+      className={`flex-1 bg-gray-900 p-6 transition-all duration-300 mx-auto  relative${
+        isSidebarOpen ? "md:ml-0" : "w-full mx-auto"
+      }`}
+    >
+      <div className="flex justify-between ">
+      <button
+        onClick={toggleSidebar}
+        className="mb-4 px-4 py-2 bg-transparent text-white rounded-md "
       >
-        {loading ? (
-          <Skeleton
-            active
-            paragraph={{ rows: 10 }}
-            // style={{
-            // //   backgroundColor: "#d1d5db", // Base gray color
-            //   backgroundImage:
-            //     "linear-gradient(90deg, #d1d5db 25%, #e5e7eb 50%, #d1d5db 75%)", // Stripe animation colors
-            // }}
+        {isSidebarOpen ? (<TbLayoutSidebarLeftCollapse  className="bg-gray-900" size ="36px" title="close Sidebar"/>
+
+) : (<TbLayoutSidebarLeftExpand className="bg-gray-900" size ="36px" title="open sidebar"/>
+)}
+      </button>
+      <div className="relative">
+        {
+          !user?(<button  className="bg-gray-300 text-gray-900 rounded-2xl px-10 py-2" onClick={showModal}>Log in </button>):
+          (<img 
+            src={user.photo}
+            alt={user.name}
+            className="w-10 h-10 rounded-full border-2 border-gray-400 cursor-pointer"
+            title={user.name}
+            onClick={handleImageClick}
+
           />
-        ) : data ? (
-          classifyAndFormat(data)
-        ) : (
-          <p className="text-gray-500"></p>
-        )}
-      </div> */}
-       <div
-        className="w-9/12 bg-gray-900 rounded-lg shadow-md p-4 overflow-auto relative custom-scrollbar"
-        style={{ height: `calc(${100}vh - ${200}px)` }}
-        ref={chatContainerRef}
-      >
-        {loading && chat.length === 0 ? (
-          <Skeleton
-            active
-            paragraph={{ rows: 10 }}
-            style={{
-              backgroundImage:
-                "linear-gradient(90deg, #d1d5db 25%, #e5e7eb 50%, #d1d5db 75%)",
-            }}
-          />
-        ) : chat.length === 0 ? (
-          <p className="text-gray-500 text-center">No messages yet. Start chatting!</p>
-        ) : (
-            <ul className="w-full">
-            {chat.map((chat, index) => (
-              <li key={index} className="mb-4 w-full">
-                {/* User Message */}
-                <div className="flex items-start flex-row-reverse mb-2">
-                  <div className="bg-gray-500 text-white w-10 h-10 rounded-full flex items-center justify-center ml-3">
-                    U
-                  </div>
-                  <div className="bg-gray-800 p-2 rounded-2xl text-white max-w-[60%]">
-                    <p className="p-4">{chat.input}</p>
-                  </div>
-                </div>
-                {/* AI Response */}
-                {chat.response && (
-                  <div className="flex items-start">
-                    <div className="bg-gray-900 text-white w-10 h-10 rounded-full flex items-center justify-center mr-3">
-                      AI
-                    </div>
-                    <div className="bg-gray-800 p-2 rounded-2xl text-white max-w-[90%]">
-                      <p className="p-4">{chat.response}</p>
-                    </div>
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
-          
-          
-        )}
-       
+        )
+        
+
+        }
+
+      {/* Logout Button */}
+      {showLogout && user &&(
+        <button
+          onClick={handleLogout}
+          className="absolute left-1/2 transform -translate-x-1/2 mt-1 px-3 py-1 bg-white text-gray-800 border border-gray-300 rounded shadow-md"
+        >
+          Logout
+        </button>
+      )}
+      
+      
+
       </div>
+      <Modal
+        title="Login"
+        open={isModalOpen}
+        onCancel={handleCancel}
+        footer={null}
+        centered
+      >
+        <Button
+          className="w-full bg-gray-600 text-white py-5 px-10 flex flex-row items-center justify-center gap-2 rounded-lg hover:bg-gray-900"
+          onClick={handleOk}
+        >
+          <GoogleOutlined />
+          <span>Continue with Google</span>
+        </Button>
+      </Modal>
+      
+      </div>
+     
+      <div className="w-9/12 bg-gray-900 rounded-lg shadow-md p-4 overflow-auto relative custom-scrollbar mx-auto"
+     style={{ height: `calc(${100}vh - ${200}px)` }} ref={chatContainerRef}>
+    {loading && chat.length === -1 ? (
+        <Skeleton active paragraph={{ rows: 10 }} style={{ backgroundImage: "linear-gradient(90deg, #d1d5db 25%, #e5e7eb 50%, #d1d5db 75%)" }} />
+    ) : chatMessages.length === 0 ? (
+        <p className="text-gray-500 text-center">No messages yet. Start chatting!</p>
+    ) : (
+        <ul className="w-full">
+            {chatMessages.map((chat, index) => (
+                <li key={index} className="mb-4 w-full">
+                    {/* User Message */}
+                    <div className="flex items-start flex-row-reverse mb-2">
+                        <div className="bg-gray-500 text-white w-10 h-10 rounded-full flex items-center justify-center ml-3">U</div>
+                        <div className="bg-gray-800 p-2 rounded-2xl text-white max-w-[60%]">
+                            <p className="p-4">{chat.userMessage}</p>
+                        </div>
+                    </div>
+                    {/* AI Response */}
+                    {chat.aiResponse && (
+                        <div className="flex items-start">
+                            <div className="bg-gray-900 text-white w-10 h-10 rounded-full flex items-center justify-center mr-3">AI</div>
+                            <div className="bg-gray-800 p-2 rounded-2xl text-white max-w-[90%]">
+                                <p className="p-4">{classifyAndFormat(chat.aiResponse)}</p>
+                            </div>
+                        </div>
+                    )}
+                </li>
+            ))}
+        </ul>
+    )}
+</div>
+
       
       <div>
 
@@ -279,7 +590,7 @@ const PromptInput = () => {
                     ? "opacity-50 cursor-not-allowed"
                     : ""
                 }`}
-                onClick={handleSubmit}
+                onClick={handleSubmit1}
                 
 
                 disabled={

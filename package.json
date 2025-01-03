@@ -4,7 +4,9 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@ant-design/icons": "^5.5.2",
     "@google/generative-ai": "^0.21.0",
+    "@heroicons/react": "^1.0.6",
     "@reduxjs/toolkit": "^2.5.0",
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^13.4.0",
